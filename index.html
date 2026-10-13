@@ -63,7 +63,6 @@ select{flex:1;min-width:0;background:#000;color:#fff;border:1px solid #444;heigh
 .eqgrid span{color:#bdbdbd}
 footer{text-align:center;padding:34px 16px calc(34px + env(safe-area-inset-bottom,0px));color:var(--muted);font-size:14px;letter-spacing:.15em;text-transform:uppercase}
 footer a{color:var(--ink)}
-#adminlink{color:var(--muted);margin-left:10px}
 #drawer{position:fixed;inset:0 0 0 auto;width:min(400px,100%);background:#0a0a0a;border-left:2px solid var(--red);z-index:50;transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;padding:16px;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 #drawer.open{transform:none}
 #drawer h3{font-family:var(--disp);font-weight:400;font-size:42px;margin:0;color:var(--ink)}
@@ -81,6 +80,14 @@ footer a{color:var(--ink)}
 #adminbar .ed{width:190px}#adminbar .add{width:auto;padding:11px 16px}
 body.editing{padding-bottom:110px}
 @media(max-width:520px){.strip{letter-spacing:.35em;font-size:13px}.orn{opacity:.28;width:40vw}.links{gap:12px;font-size:12px}}
+.flogo{font-family:var(--disp);font-size:38px;color:#4a4a4a;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation;display:inline-block;padding:6px 14px;letter-spacing:.04em;transition:color .2s,text-shadow .2s}
+.flogo.hold{color:var(--red);text-shadow:0 0 14px rgba(193,18,31,.8)}
+.fsmall{margin-top:6px}
+#pw{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.8);display:grid;place-items:center;padding:16px}
+.pwbox{background:#0a0a0a;border:1px solid var(--red);padding:18px;width:min(320px,100%);display:flex;flex-direction:column;gap:10px;font-size:18px;text-transform:uppercase;letter-spacing:.12em}
+#pwerr{color:var(--red);font-size:14px;min-height:16px}
+.pwrow{display:flex;gap:8px}.pwrow .add{flex:1}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:70;background:#fff;color:#000;padding:10px 16px;font-weight:700;max-width:90%;text-align:center}
 </style>
 </head>
 <body>
@@ -123,8 +130,10 @@ body.editing{padding-bottom:110px}
     <a class="cta" id="wapers" href="#" target="_blank" rel="noopener">Consultar por WhatsApp</a>
   </div>
 </section>
-<footer>© 2026 Asutella · <a href="https://instagram.com/asutella_team" target="_blank" rel="noopener">@asutella_team</a> <a id="adminlink" href="#" hidden>Editar tienda</a></footer>
-<div id="adminbar" hidden><input class="ed" id="wa" placeholder="WhatsApp (549...)" inputmode="numeric"><button class="add" id="newp">＋ Producto</button><button class="add" id="save">Guardar y publicar</button><button class="add del" id="cancel">Cancelar</button></div>
+<footer><div id="flogo" class="flogo">Asutella</div><div class="fsmall">© 2026 · <a href="https://instagram.com/asutella_team" target="_blank" rel="noopener">@asutella_team</a></div></footer>
+<div id="pw" hidden><div class="pwbox"><b>Acceso admin</b><input id="pwin" type="password" class="ed" placeholder="Contraseña" autocomplete="off"><div id="pwerr"></div><div class="pwrow"><button class="add" id="pwok">Entrar</button><button class="add del" id="pwcancel">Cancelar</button></div></div></div>
+<div id="toast" hidden></div>
+<div id="adminbar" hidden><input class="ed" id="wa" placeholder="WhatsApp (549...)" inputmode="numeric"><button class="add" id="newp">＋ Producto</button><button class="add" id="save">Guardar y publicar</button><button class="add del" id="cancel">Salir</button></div>
 
 <aside id="drawer" aria-label="Carrito">
   <button class="close" id="close">✕</button>
@@ -218,7 +227,7 @@ function setEdit(on){
  edit=on;document.body.classList.toggle("editing",on);$("#adminbar").hidden=!on;
  $("#wa").value=WA;$("#drawer").classList.remove("open");chips();grid();
 }
-$("#adminlink").onclick=e=>{e.preventDefault();setEdit(true);scrollTo({top:$("#tienda").offsetTop-60,behavior:"smooth"})};
+
 $("#wa").oninput=e=>{WA=e.target.value.replace(/\D/g,"");wl()};
 $("#newp").onclick=()=>{PRODUCTS.push({id:Date.now(),name:"Nuevo producto",cat:cat==="Todo"?"Otros":cat,price:0,emoji:"🛍️",color:"#333",accent:"#ff86c0",img:""});chips();grid()};
 $("#cancel").onclick=()=>location.reload();
@@ -229,19 +238,35 @@ $("#save").onclick=async()=>{
  ["#chips","#grid","#items"].forEach(q=>c.querySelector(q).innerHTML="");
  c.querySelector("#drawer").classList.remove("open");
  c.querySelector("#count").textContent="0";c.querySelector("#total").textContent="$0";
- c.querySelector("#adminbar").hidden=true;c.querySelector("#adminlink").hidden=true;
+ c.querySelector("#adminbar").hidden=true;c.querySelector("#toast").hidden=true;c.querySelector("#pw").hidden=true;
  c.querySelector("body").classList.remove("editing");
  c.querySelector("#data").textContent=JSON.stringify(DATA).replace(/</g,"\\u003c");
- try{await art.publish("<!DOCTYPE html>\n"+c.outerHTML)}
+ if(!art){b.textContent="Guardar y publicar";toast("Para guardar, abrí la página desde la app de Claude con tu cuenta.");return}try{await art.publish("<!DOCTYPE html>\n"+c.outerHTML)}
  catch(err){
   b.textContent="Guardar y publicar";
-  if(err&&(err.code==="not_writer"||err.code==="not_granted")){alert("Solo quien creó la página puede guardar cambios.");$("#adminlink").hidden=true;setEdit(false)}
-  else if(err&&err.code!=="conflict")alert("No se pudo guardar. Probá de nuevo.");
+  if(err&&(err.code==="not_writer"||err.code==="not_granted")){toast("Solo quien creó la página puede guardar cambios.");setEdit(false)}
+  else if(err&&err.code!=="conflict")toast("No se pudo guardar. Probá de nuevo.");
  }
 };
 const wl=()=>{const a=$("#wapers");if(a)a.href="https://wa.me/"+WA+"?text="+encodeURIComponent("Hola! Quiero consultar por indumentaria personalizada para mi equipo / academia.")};wl();
 chips();grid();render();
-(async()=>{try{art=await window.claude?.use("artifact");if(art)$("#adminlink").hidden=false}catch(e){}})();
+function toast(t){const d=$("#toast");d.textContent=t;d.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{d.hidden=true},4500)}
+async function getArt(){if(!art){for(let i=0;i<50&&!window.claude;i++)await new Promise(r=>setTimeout(r,200));try{if(window.claude)art=await window.claude.use("artifact")}catch(e){}}return art}
+getArt();
+(()=>{const f=$("#flogo");let t=null;
+ const stop=()=>{clearTimeout(t);t=null;f.classList.remove("hold")};
+ f.addEventListener("pointerdown",()=>{f.classList.add("hold");t=setTimeout(()=>{stop();openPw()},3000)});
+ ["pointerup","pointerleave","pointercancel"].forEach(ev=>f.addEventListener(ev,stop));
+ f.addEventListener("contextmenu",e=>e.preventDefault());
+})();
+function openPw(){$("#pw").hidden=false;$("#pwin").value="";$("#pwerr").textContent="";setTimeout(()=>$("#pwin").focus(),50)}
+$("#pwcancel").onclick=()=>{$("#pw").hidden=true};
+$("#pwok").onclick=async()=>{
+ if($("#pwin").value!=="admin1234"){$("#pwerr").textContent="Contraseña incorrecta";return}
+ $("#pw").hidden=true;await getArt();setEdit(true);scrollTo({top:$("#tienda").offsetTop-60,behavior:"smooth"});
+ if(!art)toast("Para guardar, abrí la página desde la app de Claude con tu cuenta.");
+};
+$("#pwin").onkeydown=e=>{if(e.key==="Enter")$("#pwok").click()};
 </script>
 </body>
 </html>
